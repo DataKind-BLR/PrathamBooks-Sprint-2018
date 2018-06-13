@@ -5,7 +5,7 @@ Code and documentation for the collaboration with PrathamBooks during Sprint' 20
 At the time of committing this readme file, Pratham Books' StoryWeaver platform has 8000+ books in 113 languages (70+ International languages and 30+ Indian Languages) distributed across 25+ categories with hundred of tags. As StoryWeaver scales up to host 20K stories over next year or so, discoverability of books (inside the StoryWeaver platform as well as across the web via search engines) could be a challenge. DataKind intends to solve this using various Natural Language Processing and Machine Learning tools out there.
 
 ### Problem Statement: 
-I want to build a tool to generate relevant tags for each story to improve the searchability of content on StoryWeaver platform.
+Build a tool to generate relevant tags for each story to improve the searchability of content on StoryWeaver platform.
 
 ### Contributing Guidelines
 Most Important rule of collaborating **Ask Questions**. We encourage all kinds of questions. As a community we respect your will to contribute and we want to help you do that. So, reach us out over slack or raise an issue on github with your question.
