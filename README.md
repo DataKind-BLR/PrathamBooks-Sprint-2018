@@ -12,7 +12,7 @@ Most Important rule of collaborating **Ask Questions**. We encourage all kinds o
 
 Incase you are not on our slack follow the [link](https://dkblr-slack.herokuapp.com) to join us and join the channel #pratham_books ([How to join a channel](https://www.wikihow.com/Join-a-Channel-on-Slack)) and incase you are new to Github checkout how to create an Issue [here](https://help.github.com/articles/creating-an-issue/).
 
-Contributions in form of pull requests are highly appreciated ([How to create a PR?](https://help.github.com/articles/creating-a-pull-request/)). All your work must be donated under MIT License, too.
+Contributions are expected in the form of pull requests ([How to create a PR?](https://help.github.com/articles/creating-a-pull-request/)). All your work must be donated under MIT License, too.
 
 ### Data Description:
 
