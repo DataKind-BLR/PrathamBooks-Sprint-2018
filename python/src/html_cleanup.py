@@ -1,8 +1,14 @@
+# This script cleans HTML tags from the story content data using BeautifulSoup.
+# Input - '-i' for input csv file
+#         '-o' for output csv file
+# Output - None (files are directly modified)
+# Example usage - python HTMLCleanup -i data_in.csv -o data_out.csv
+
 import getopt, sys, csv
 from bs4 import BeautifulSoup, Comment
 
-# Argument phraser
-opts, args = getopt.getopt(sys.argv[1:], 'i:o:')
+# Argument parser
+opts, args = getopt.getopt(sys.argv[1:], 'i:o:h')
 
 file_in = None
 file_out = None
@@ -11,6 +17,15 @@ for o, a in opts:
 		file_in = a
 	elif o == '-o':
 		file_out = a
+	elif o == '-h':
+		print(
+'''This script cleans HTML tags from the story content data using BeautifulSoup.
+Input - '-i' for input csv file
+        '-o' for output csv file
+Output - None (files are directly modified)
+Example usage - python HTMLCleanup -i data_in.csv -o data_out.csv)'''
+		)
+		exit(0)
 
 # Data extraction
 data = []
