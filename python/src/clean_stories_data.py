@@ -29,7 +29,7 @@ def remove_html_tags(html_text):
     
     for style_tag in soup.findAll('style'):
         style_tag.replace_with('')
-    return(soup.get_text(strip=True))
+    return(soup.get_text(separator=" ", strip=True))
 
 
 
