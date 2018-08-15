@@ -1,3 +1,4 @@
+import os
 import argparse
 from bs4 import BeautifulSoup, Comment
 import pandas as pd
@@ -31,7 +32,16 @@ def remove_html_tags(html_text):
         style_tag.replace_with('')
     return(soup.get_text(separator=" ", strip=True))
 
-
+def check_if_path_exists(path):
+    '''
+    Utility function to check if a file or directory path exists
+    '''
+    os_path = os.path.abspath(path)
+    if not os.path.exists(os_path):
+        print("ERROR : Path provided as an argument does not exist :", path)
+        exit()
+    else:
+        return os_path
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-i", "--input", help="path of the raw stories file ", required=True)
@@ -42,9 +52,20 @@ args = parser.parse_args()
 # TODO Address the warnings instead of ignoring those
 warnings.filterwarnings('ignore')
 
-#
+# Read the input file name and output directory name
 file_in = args.input
 file_out = args.output
+
+# Validate if the input path exists
+ip_path = check_if_path_exists(file_in)
+# All good. Print the location of the input file
+print("Location of the raw pages data:", ip_path)
+
+# Validate if the output path exists
+op_path = check_if_path_exists(file_out)
+# All good. Print the location of the output file
+print("Directory where output will be generated:", op_path)
+
 
 print("Reading raw data....")
 # Load the data
@@ -73,7 +94,6 @@ df_raw.stories_summary = df_raw.stories_summary.str.replace("\r", " ")
 df_raw.stories_summary = df_raw.stories_summary.str.replace("\t", " ")
 
 # Now that meaningful data has been extracted, filter further. Get the stories pages which have valid content.
-#df_stories_with_story_pages = df_raw[(df_raw.page_type == "StoryPage") & (df_raw.page_content.notnull())]
 df_stories_with_story_pages = df_raw[(df_raw.page_content.notnull())]
 
 print("Total number of pages with meaningful content:", df_raw.shape[0])
@@ -101,16 +121,15 @@ df_stories_with_content.drop(['position', 'page_id'], 'columns', inplace=True)
 print("Recheck : Number of unique stories with meaningful content:", df_raw.story_id.nunique())
 
 # Dump the content of English stories only!
-location_of_english_csv = file_out + "stories_content_english.csv"
+location_of_english_csv = os.path.join(op_path, "stories_content_english.csv")
 print("Writing stories in English at " + location_of_english_csv)
 df_stories_with_content[df_stories_with_content.language_name == "English"].to_csv(location_of_english_csv, sep=",", index=False)
 print("Number of English stories with meaningful content:", 
 	df_stories_with_content[df_stories_with_content.language_name == "English"]['story_id'].nunique())
 
 # Dump content of all stories
-location_of_all_language_csv = file_out + "stories_content_all_language.csv"
+location_of_all_language_csv = os.path.join(op_path, "stories_content_all_language.csv")
 print("Writing stories in English at " + location_of_all_language_csv)
 df_stories_with_content.to_csv(location_of_all_language_csv, sep=",", index=False)
 print("Number of stories in different languages with meaningful content:", 
 	df_stories_with_content['story_id'].nunique())
-
