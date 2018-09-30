@@ -1,0 +1,462 @@
+---
+title: "DataKind - BLR - Pratham Books Sprint - Exploratory Analysis"
+author: "Arpit Arora"
+output:
+  html_document:
+    highlight: tango
+    theme: yeti
+    toc: yes
+    toc_depth: 6
+---
+
+#### Objective
+
+1. Clean and normalize the data for analysis
+2. Exploratory analysis of the stories data
+
+#### Setting up the working environment
+
+```{r setup}
+# Setting up the working directory
+knitr::opts_knit$set(root.dir = "~/Documents/DataKind/PrathamBooks-Sprint-2018/data")
+
+# Load the required libraries
+library(tidyverse)
+library(formattable)
+
+# Set plot theme
+theme_set(theme_classic())
+```
+
+#### Reading the datasets
+
+```{r read, message = FALSE, cache = TRUE, warning = FALSE}
+# Reading the data files
+stories <- read_csv("raw/stories.csv")
+
+categories <- read_csv("raw/categories.csv")
+
+tags <- read_csv("raw/tags.csv")
+
+authors <- read_csv("raw/authors.csv")
+
+illustrators <- read_csv("raw/illustrators.csv")
+
+stories_pages_illustrations_master <- read_csv("raw/stories_pages_illustrations_master.csv")
+```
+
+```{r}
+glimpse(stories_pages_illustrations_master)
+```
+
+
+#### Exploratory Data Analysis - Stories
+
+##### Cleaning the dataset
+
+```{r stories}
+# Stories dataset
+# Clean-up and transform dataset for analysis
+stories <- stories %>%
+                mutate(reading_level_updated = paste0("L", reading_level + 1),
+                       # Normalize the reading_level field
+                       ancestry_updated = ifelse(is.na(ancestry), story_id, ancestry),
+                       # Normalize the ancestry field
+                       derivation_type_updated = ifelse(is.na(derivation_type), "original", derivation_type),
+                       # Get recommended story indicator
+                       is_recommended_story = ifelse(is.na(publisher), F, T)
+                      )
+
+# Roll-up the categories dataset
+categories_grouped <- aggregate(category_name ~ story_id, data = categories, paste, collapse = ", ")
+
+# Roll-up the tags dataset
+tags_grouped<- aggregate(tag_name ~ story_id, data = tags, paste, collapse = ", ")
+
+# Clean up author dataset
+authors <- authors %>%
+                mutate(author_name = paste(author_first_name, author_last_name, sep = " ")) %>%
+                select(story_id, author_name)
+
+authors_grouped <- aggregate(author_name ~ story_id, data = authors, paste, collapse = ", ")
+
+# Clean the illustrators dataset
+illustrators <- illustrators %>%
+                    mutate(illustrator_name = paste(illustrator_first_name, illustrator_last_name, sep = " ")) %>%
+                    select(story_id, illustrator_name)
+                
+illustrators_grouped <- aggregate(illustrator_name ~ story_id, data = illustrators, paste, collapse = ", ")
+
+# Clean ancestry for double parent stories
+stories <- stories %>% 
+                separate(ancestry_updated, c("ancestry_updated"), "/", extra = "drop", fill = "right")
+
+stories$ancestry_updated <- as.numeric(stories$ancestry_updated)
+
+# Processing data to creater master file for dashboard
+# Join all the relevant data files
+stories_master <- stories %>%
+                    left_join(categories_grouped, by = "story_id") %>%
+                    left_join(tags_grouped, by = "story_id") %>%
+                    left_join(authors_grouped, by = "story_id") %>%
+                    left_join(illustrators_grouped, by = "story_id") %>%
+                    left_join(authors_grouped, by = c("ancestry_updated" = "story_id"), suffix = c("_transaltor", "_author"))
+
+# Create clean author/illustrator/translator fields
+stories_master <- stories_master %>%
+                    mutate(translator_name = ifelse(derivation_type_updated == "original", "" , author_name_transaltor))
+
+stories_master$author_name_updated <- str_replace(stories_master$author_name_author, " NA", "")
+stories_master$illustrator_name_updated <- str_replace(stories_master$illustrator_name, " NA", "")
+stories_master$translator_name_updated <- str_replace(stories_master$translator_name, " NA", "")
+
+# Publisher story indicator
+stories_master$publisher_type <- ifelse(is.na(stories_master$publisher), "UGC", "Publisher")
+
+# Normalize data fields for use
+stories_master$reading_level_updated <- as.factor(stories_master$reading_level_updated)
+stories_master$language_name <- as.factor(stories_master$language_name)
+stories_master$derivation_type_updated <- as.factor(stories_master$derivation_type_updated)
+stories_master$publisher <- as.factor(stories_master$publisher)
+stories_master$publisher_type <- as.factor(stories_master$publisher_type)
+
+stories_final <- stories_master %>%
+                    select(story_id, title, english_title, reading_level_updated, language_name,
+                           synopsis, ancestry_updated, derivation_type_updated, reads, 
+                           publisher, publisher_type, category_name, tag_name, is_recommended_story,
+                           author_name_updated, illustrator_name_updated, translator_name_updated)
+```
+
+##### Summary of the dataset
+
+```{r stories summary}
+# Summary of the dataset
+glimpse(stories_final)
+
+# No. of stories
+length(unique(stories_final$story_id))
+
+# No. of Langugages
+length(unique(stories_final$language_name))
+
+# All reading levels
+unique(stories_final$reading_level_updated)
+
+# All publisher names
+unique(stories_final$publisher_type)
+
+# All story types
+unique(stories_final$derivation_type_updated)
+
+# No. of original stories
+length(unique(stories_final$ancestry_updated))
+
+# Total Reads
+sum(stories_final$reads)
+
+# Avg. Reads
+mean(stories_final$reads)
+
+# Preview of the dataset
+head(stories_final)
+```
+
+##### Exploratory plots
+
+We look at different cuts of the data to understand the compostion and device an approach.
+
+```{r plots 1}
+# Languages with most stories
+top_language <- stories_final %>%
+                    group_by(language_name) %>%
+                    summarise(count = n()) %>%
+                    mutate(percent = prop.table(count) * 100) %>%
+                    arrange(desc(count)) %>%
+                    head(10)
+
+# Create the plot
+ggplot(top_language, aes(x = reorder(language_name, -count), y = percent, fill = language_name)) +
+    geom_bar(stat = "identity", width = 0.5) +
+    geom_text(aes(y = percent + 1, label = paste0(sprintf(percent, fmt = "%.2f"), '%')), 
+              position = position_dodge(width = .9), size = 3) +
+    theme(plot.title = element_text(hjust = 0.5),
+          axis.text.x = element_text(angle = 50, hjust = 1)) +
+    labs(title = "Most publsished languges", x = "Language", y = "% Stories") +
+    guides(fill = FALSE)
+
+
+# Most read languages
+top_language <- stories_final %>%
+                    group_by(language_name) %>%
+                    summarise(reads = sum(reads)) %>%
+                    mutate(percent = prop.table(reads) * 100) %>%
+                    arrange(desc(reads)) %>%
+                    head(10)
+
+# Create the plot
+ggplot(top_language, aes(x = reorder(language_name, -reads), y = percent, fill = language_name)) +
+    geom_bar(stat = "identity", width = 0.5) +
+    geom_text(aes(y = percent + 1.8, label = paste0(sprintf(percent, fmt = "%.2f"), '%')), 
+              position = position_dodge(width = .9), size = 3) +
+    theme(plot.title = element_text(hjust = 0.5),
+          axis.text.x = element_text(angle = 50, hjust = 1)) +
+    labs(title = "Top read languages", x = "Language", y = "% Reads") +
+    guides(fill = FALSE)
+
+# 24% of all books published are in english
+# 60% of all stories read are in the english
+```
+
+```{r plots 2}
+# Count and Readership by story levels
+top_level <- stories_final %>%
+                    group_by(reading_level_updated) %>%
+                    summarise(count = n(), reads = sum(reads)) %>%
+                    mutate(percent_count = prop.table(count), percent_reads = prop.table(reads))
+
+# Format uinque fields
+top_level$count <- accounting(top_level$count, format = "d")
+top_level$reads <- accounting(top_level$reads, format = "d")
+top_level$percent_count <- percent(top_level$percent_count)
+top_level$percent_reads <- percent(top_level$percent_reads)
+
+# Create table
+formattable(top_level, list(count = color_bar("orange"),
+                            reads = color_bar("lightgreen"),
+                            percent_count = color_tile("transparent", "lightblue"),
+                            percent_reads = color_tile("transparent", "pink")))
+
+# 47% of L1 stories have 38% readership
+```
+
+```{r plots 3}
+# Count and Readership by recommendation of story
+recco <- stories_final %>%
+                group_by(is_recommended_story) %>%
+                summarise(count = n(), reads = sum(reads)) %>%
+                mutate(percent_count = prop.table(count), percent_reads = prop.table(reads))
+
+# Format uinque fields
+recco$count <- accounting(recco$count, format = "d")
+recco$reads <- accounting(recco$reads, format = "d")
+recco$percent_count <- percent(recco$percent_count)
+recco$percent_reads <- percent(recco$percent_reads)
+
+# Create table
+formattable(recco, list(count = color_bar("orange"),
+                        reads = color_bar("lightgreen"),
+                        percent_count = color_tile("transparent", "lightblue"),
+                        percent_reads = color_tile("transparent", "pink")))
+
+# All publisher stories and only publisher stories are recommended stories
+# 32% of the stories are recommended with have 66% reads
+```
+
+```{r plots 4}
+# Count and Readership by original or derivative
+orig <- stories_final %>%
+            group_by(derivation_type_updated) %>%
+            summarise(count = n(), reads = sum(reads)) %>%
+            mutate(percent_count = prop.table(count), percent_reads = prop.table(reads))
+
+# Format uinque fields
+orig$count <- accounting(orig$count, format = "d")
+orig$reads <- accounting(orig$reads, format = "d")
+orig$percent_count <- percent(orig$percent_count)
+orig$percent_reads <- percent(orig$percent_reads)
+
+# Create table
+formattable(orig, list(count = color_bar("orange"),
+                        reads = color_bar("lightgreen"),
+                        percent_count = color_tile("transparent", "lightblue"),
+                        percent_reads = color_tile("transparent", "pink")))
+
+# 28% of the stories are originals which have 60% reads
+```
+
+```{r plots 5}
+# Look at readership and count by organisations
+org_name <- stories_final %>%
+                group_by(publisher) %>%
+                filter(publisher != "NA") %>%
+                summarise(count = n(), reads = sum(reads)) %>%
+                mutate(percent_count = prop.table(count), percent_reads = prop.table(reads)) %>%
+                arrange(desc(reads))
+
+# Format uinque fields
+org_name$count <- accounting(org_name$count, format = "d")
+org_name$reads <- accounting(org_name$reads, format = "d")
+org_name$percent_count <- percent(org_name$percent_count)
+org_name$percent_reads <- percent(org_name$percent_reads)
+
+# Create table
+formattable(org_name, list(count = color_bar("orange"),
+                        reads = color_bar("lightgreen"),
+                        percent_count = color_tile("transparent", "lightblue"),
+                        percent_reads = color_tile("transparent", "pink")))
+
+# 87% of all publisher stories on the platform are by Pratham Books
+# 88% of all publisher stories reads on the platform are for Pratham Books
+```
+
+#### Exploratory Data Analysis - Categories
+
+##### Summary of the dataset
+
+```{r category summary}
+# Summary of the dataset
+glimpse(categories)
+
+# No. of unique categories
+length(unique(categories$category_name))
+
+# List of unique categories
+unique(categories$category_name)
+```
+
+##### Exploratory plots
+
+```{r plots 6}
+# Most used categories
+top_categories <- categories %>%
+                    group_by(category_name) %>%
+                    summarise(count = n()) %>%
+                    mutate(percent = prop.table(count) * 100) %>%
+                    arrange(desc(count)) %>%
+                    head(10)
+
+# Create the plot
+ggplot(top_categories, aes(x = reorder(category_name, -count), y = percent, fill = category_name)) +
+    geom_bar(stat = "identity", width = 0.5) +
+    geom_text(aes(y = percent + 1, label = paste0(sprintf(percent, fmt = "%.2f"), '%')), 
+              position = position_dodge(width = .9), size = 3) +
+    theme(plot.title = element_text(hjust = 0.5),
+          axis.text.x = element_text(angle = 50, hjust = 1)) +
+    labs(title = "Top Categories", x = "Category", y = "%") +
+    guides(fill = FALSE)
+```
+
+#### Exploratory Data Analysis - Tags
+
+##### Summary of the dataset
+
+```{r tag summary}
+# Summary of the dataset
+glimpse(tags)
+
+# No. of unique tags
+length(unique(tags$tag_name))
+```
+
+##### Exploratory plots
+
+```{r plots 7}
+# Most used categories
+top_tags <- tags %>%
+                group_by(tag_name) %>%
+                summarise(count = n()) %>%
+                mutate(percent = prop.table(count) * 100) %>%
+                arrange(desc(count)) %>%
+                head(10)
+
+# Create the plot
+ggplot(top_tags, aes(x = reorder(tag_name, -count), y = percent, fill = tag_name)) +
+    geom_bar(stat = "identity", width = 0.5) +
+    geom_text(aes(y = percent + .1, label = paste0(sprintf(percent, fmt = "%.2f"), '%')), 
+              position = position_dodge(width = .9), size = 3) +
+    theme(plot.title = element_text(hjust = 0.5),
+          axis.text.x = element_text(angle = 50, hjust = 1)) +
+    labs(title = "Top Tags", x = "Tag", y = "%") +
+    guides(fill = FALSE)
+```
+
+#### Exploratory Data Analysis - Stories + Pages + Illustrations
+
+##### Cleaning the dataset
+
+```{r stories_pages_illustrations_master}
+# stories_pages_illustrations_master dataset
+# Clean-up and transform dataset for analysis
+stories_pages_illustrations_master <- 
+            stories_pages_illustrations_master %>%
+                mutate(reading_level_updated = paste0("L", reading_level + 1),
+                       # Normalize the reading_level field
+                       ancestry_updated = ifelse(is.na(ancestry), story_id, ancestry),
+                       # Normalize the ancestry field
+                       derivation_type_updated = ifelse(is.na(derivation_type), "original", derivation_type),
+                       # Get recommended story indicator
+                       is_recommended_story = ifelse(is.na(publisher), F, T)
+                      )
+
+# Clean ancestry for double parent stories
+stories_pages_illustrations_master <- 
+        stories_pages_illustrations_master %>% 
+                separate(ancestry_updated, c("ancestry_updated"), "/", extra = "drop", fill = "right")
+
+stories_pages_illustrations_master$ancestry_updated <- as.numeric(stories_pages_illustrations_master$ancestry_updated)
+
+# Processing data to creater master file for dashboard
+# Join all the relevant data files
+spi_master <- stories_pages_illustrations_master %>%
+                    left_join(categories_grouped, by = "story_id") %>%
+                    left_join(tags_grouped, by = "story_id") %>%
+                    left_join(authors_grouped, by = "story_id") %>%
+                    left_join(illustrators_grouped, by = "story_id") %>%
+                    left_join(authors_grouped, by = c("ancestry_updated" = "story_id"), suffix = c("_transaltor", "_author"))
+
+# Create clean author/illustrator/translator fields
+spi_master <- spi_master %>%
+                    mutate(translator_name = ifelse(derivation_type_updated == "original", "" , author_name_transaltor))
+
+spi_master$author_name_updated <- str_replace(spi_master$author_name_author, " NA", "")
+spi_master$illustrator_name_updated <- str_replace(spi_master$illustrator_name, " NA", "")
+spi_master$translator_name_updated <- str_replace(spi_master$translator_name, " NA", "")
+
+# Publisher story indicator
+spi_master$publisher_type <- ifelse(is.na(spi_master$publisher), "UGC", "Publisher")
+
+# Normalize data fields for use
+spi_master$reading_level_updated <- as.factor(spi_master$reading_level_updated)
+spi_master$language_name <- as.factor(spi_master$language_name)
+spi_master$derivation_type_updated <- as.factor(spi_master$derivation_type_updated)
+spi_master$publisher <- as.factor(spi_master$publisher)
+spi_master$publisher_type <- as.factor(spi_master$publisher_type)
+
+# Clean the Story Page text
+cleanHTML <- function(htmlString) {
+  return(gsub("<.*?>", "", htmlString))
+}
+
+spi_master$story_page_updated <- cleanHTML(spi_master$story_page)
+
+# Create Master File for usage
+spi_final <- spi_master %>%
+                    select(story_id, title, english_title, reading_level_updated, language_name,
+                           synopsis, ancestry_updated, derivation_type_updated, reads, 
+                           publisher, publisher_type, category_name, tag_name, is_recommended_story,
+                           author_name_updated, illustrator_name_updated, translator_name_updated,
+                           story_page_position, story_page_updated, story_page_type, illustration_name)
+
+glimpse(spi_final)
+```
+
+##### Summary of the dataset
+
+```{r, warning = FALSE}
+# No. of pages/story
+length(spi_final$story_page_position[spi_final$story_page_type == "StoryPage"])/length(unique(spi_final$story_id))
+
+# No. of illustations/story
+length(spi_final$illustration_name[!is.na(spi_final$illustration_name)])/length(unique(spi_final$story_id))
+
+# Max pages in a story
+max(spi_final$story_page_position)
+
+# No. of unique illustrations
+length(unique(spi_final$illustration_name))
+```
+
+```{r}
+# Store the cleaned file for pre-processing
+write_csv(spi_final, "../data/pre_processed/spi_cleaned.csv")
+```
