@@ -10,6 +10,8 @@ So we are extending the valid tags list by, idea taken from http://www.aclweb.or
 
 This list can be extended more and by default all the matches are of equal weights.
 '''
+import re
+
 
 class EvalFunction(object):
     '''
@@ -38,12 +40,15 @@ class ExactEvalFunction(EvalFunction):
     '''
     Eval Function to do exact matching of the keywords
     '''
+    WORD_MATCHER = r"[a-zA-Z]+"
 
     def pre_process(keywords):
         '''
         Basic processing, lower the keywords
         '''
-        return [word.lower() for word in keywords]
+        lower_keywords = [word.lower() for word in keywords]
+        return [' '.join(re.findall(self.WORD_MATCHER, word))
+                for word in lower_keywords]
 
     def eval(self, keywords, pred_keywords):
         '''
