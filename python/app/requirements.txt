@@ -1,0 +1,4 @@
+flask
+gensim
+nltk
+pattern
