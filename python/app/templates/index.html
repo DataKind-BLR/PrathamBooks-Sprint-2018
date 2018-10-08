@@ -34,7 +34,7 @@
       </nav>
       <div class="container" style="padding-top:5em">
         <div class="row">
-          <form class="form-inline col-md-4 col-md-offset-4" method="post">
+          <form class="form-inline col-md-4 col-md-offset-4" method="get" action="#" >
             <input id="book-url" class="form-control mr-sm-2" name="query" type="search" placeholder="Story Book Url" aria-label="Search">
             <button id="fetch-book" class="btn btn-outline-success my-2 my-sm-0" type="submit">Parse</button>
           </form>
@@ -46,6 +46,12 @@
                 <th scope="col">Model Name</th>
                 <th scope="col">Keywords</th>
               </tr>
+              {% for tag in tags %}
+              <tr>
+                <td>{{ tag['model'] }} </td>
+                <td>{{ tag['tags'] }} </td>
+              <tr>
+              {% endfor %}
             </thead>
             <tbody>
             </tbody>
