@@ -22,13 +22,19 @@ API_URI = 'https://storyweaver.org.in/api/v1/'
 def index():
     if 'query' in request.args:
         q = request.args['query']
+        if len(q.strip()) == 0:
+            return render_template('index.html')
         story_path = urllib.parse.urlparse(q).path
         api_uri_path = get_api_path(story_path)
-        text = get_pages_text(requests.get(api_uri_path).json())
+        pages_info = get_pages_info(requests.get(api_uri_path).json())
         tags = [{'model': 'LDA model',
-                 'tags': ', '.join(MODEL.predict(text))}
+                 'tags': ', '.join(MODEL.predict(pages_info['text_str']))}
                 ]
-        return render_template('index.html', tags=tags)
+        title = pages_info['title']
+        img = pages_info['image_url']
+        return render_template('index.html', tags=tags,
+                               title=title,
+                               img=img)
     return render_template('index.html')
 
 
@@ -38,15 +44,25 @@ def cleanhtml(raw_html):
     return cleantext
 
 
-def get_pages_text(resp):
+def get_pages_info(resp):
     '''Parse the request from the storyweaver api and get text of the story book
     '''
     pages = resp['data']['pages']
-    texts = []
+    parsed_info = {'texts': [],
+                   'image_url': None,
+                   'title': None}
     for page in pages:
+        if page['pageType'] == 'FrontCoverPage':
+            if parsed_info['image_url'] is None:
+                parsed_info['image_url'] = page['coverImage']['sizes'][1]['url']
+            if parsed_info['title'] is None:
+                soup = BeautifulSoup(page['html'])
+                title = soup.findAll("p", {"class": "cover_title"})[0].text
+                parsed_info['title'] = title
         cleantext = BeautifulSoup(page['html'], "lxml").text.replace('\n', ' ')
-        texts.append(cleantext)
-    return ' '.join(texts)
+        parsed_info['texts'].append(cleantext)
+    parsed_info['text_str'] = ' '.join(parsed_info['texts'])
+    return parsed_info
 
 
 def get_api_path(story_path):
