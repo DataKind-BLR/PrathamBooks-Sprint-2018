@@ -14,8 +14,8 @@ class LdaModel:
     __model = None
     __id2word_dictionary = None
 
-    DEFAULT_MODEL_FILE_LOCATION = os.path.abspath(os.path.join(os.getcwd(), "../models/lda_model"))
-    DEFAULT_DICTIONARY_FILE_LOCATION = os.path.abspath(os.path.join(os.getcwd(), "../../data/id2word_dictionary"))
+    DEFAULT_MODEL_FILE_LOCATION = os.path.abspath(os.path.join(os.getcwd(), "models/lda_model"))
+    DEFAULT_DICTIONARY_FILE_LOCATION = os.path.abspath(os.path.join(os.getcwd(), "../data/id2word_dictionary"))
 
     def __init__(self, MODEL_PATH=DEFAULT_MODEL_FILE_LOCATION, DICT_LOCATION=DEFAULT_DICTIONARY_FILE_LOCATION):
         self.__model = LdaMulticore.load(MODEL_PATH)
