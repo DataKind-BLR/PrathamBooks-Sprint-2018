@@ -1,3 +1,4 @@
+import unicodedata
 from flask import Flask, render_template, request
 import requests
 import urllib
@@ -10,6 +11,7 @@ import sys
 sys.path.insert(0, os.getcwd())
 
 from scripts.lda_model_loader import LdaModel
+from scripts.freq_word_extractor import get_freq_keywords
 
 
 app = Flask(__name__)
@@ -28,7 +30,9 @@ def index():
         api_uri_path = get_api_path(story_path)
         pages_info = get_pages_info(requests.get(api_uri_path).json())
         tags = [{'model': 'LDA model',
-                 'tags': ', '.join(MODEL.predict(pages_info['text_str']))}
+                 'tags': ', '.join(MODEL.predict(pages_info['text_str']))},
+                {'model': 'Frequency and Collations Model',
+                 'tags': ', '.join(get_freq_keywords(pages_info['text_str']))}
                 ]
         title = pages_info['title']
         img = pages_info['image_url']
@@ -59,8 +63,11 @@ def get_pages_info(resp):
                 soup = BeautifulSoup(page['html'])
                 title = soup.findAll("p", {"class": "cover_title"})[0].text
                 parsed_info['title'] = title
-        cleantext = BeautifulSoup(page['html'], "lxml").text.replace('\n', ' ')
-        parsed_info['texts'].append(cleantext)
+        if page['pageType'] == 'StoryPage':
+            cleantext = BeautifulSoup(page['html'], "lxml").text.replace('\n', ' ').replace('  ','')
+            # remove unicode
+            cleantext = unicodedata.normalize('NFKC', cleantext).replace('\"', '')
+            parsed_info['texts'].append(cleantext)
     parsed_info['text_str'] = ' '.join(parsed_info['texts'])
     return parsed_info
 
